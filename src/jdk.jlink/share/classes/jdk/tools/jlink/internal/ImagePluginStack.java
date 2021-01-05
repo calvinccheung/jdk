@@ -51,6 +51,9 @@ public final class ImagePluginStack {
     public interface ImageProvider {
 
         ExecutableImage retrieve(ImagePluginStack stack) throws IOException;
+        default boolean generateCDSArchive() {
+            return false;
+        }
     }
 
     public static final class OrderedResourcePoolManager extends ResourcePoolManager {
@@ -196,7 +199,7 @@ public final class ImagePluginStack {
         List<String> arguments = new ArrayList<>();
         plugins.stream()
                 .filter(PostProcessor.class::isInstance)
-                .map((plugin) -> ((PostProcessor)plugin).process(img))
+                .map((plugin) -> ((PostProcessor)plugin).process(img, provider))
                 .filter((lst) -> (lst != null))
                 .forEach((lst) -> {
                      arguments.addAll(lst);

@@ -29,14 +29,22 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import jdk.internal.access.JavaLangInvokeAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.tools.jlink.internal.ExecutableImage;
+import jdk.tools.jlink.internal.ImagePluginStack.ImageProvider;
+import jdk.tools.jlink.internal.PostProcessor;
 import jdk.tools.jlink.plugin.PluginException;
 import jdk.tools.jlink.plugin.ResourcePool;
 import jdk.tools.jlink.plugin.ResourcePoolBuilder;
@@ -60,7 +68,7 @@ import jdk.tools.jlink.plugin.ResourcePoolEntry;
  * feeding that into jlink using {@code --generate-jli-classes=@trace_file} can
  * help improve startup time.
  */
-public final class GenerateJLIClassesPlugin extends AbstractPlugin {
+public final class GenerateJLIClassesPlugin extends AbstractPlugin implements PostProcessor {
 
 
     private static final String DEFAULT_TRACE_FILE = "default_jli_trace.txt";
@@ -73,6 +81,94 @@ public final class GenerateJLIClassesPlugin extends AbstractPlugin {
 
     public GenerateJLIClassesPlugin() {
         super("generate-jli-classes");
+        Thread.dumpStack();
+    }
+
+    private String javaExecutableName() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return "java.exe";
+        } else {
+            return "java";
+        }
+    }
+
+    private String archivePath(ExecutableImage image) {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return image.getHome().toString() + File.separator + "bin" + File.separator + "server";
+        } else {
+            return image.getHome().toString() + File.separator + "lib" + File.separator + "server";
+        }
+    }
+
+    private void createCDSArchive(ExecutableImage image) {
+        String[] javaCmdArray = new String[] {
+            image.getHome().toString() + File.separator + "bin" + File.separator + javaExecutableName(),
+            "-Xshare:dump",
+        };
+        List<String> javaCmd = Arrays.asList(javaCmdArray);
+        System.out.println("command: " + javaCmd.stream().collect(
+                                             Collectors.joining(" ")));
+        ProcessBuilder builder = new ProcessBuilder(javaCmd);
+        int status = -1;
+        try {
+            Process p = builder.start();
+            status = p.waitFor();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        if (status == 0) {
+            System.out.println("Created CDS archive successfully");
+        } else {
+            System.out.println("Failed creating CDS archive!");
+        }
+    }
+
+    private void createNoCoopsCDSArchive(ExecutableImage image) {
+        String archiveName = archivePath(image) + File.separator + "classes_nocoops.jsa";
+        String[] javaCmdArray = new String[] {
+            image.getHome().toString() + File.separator + "bin" + File.separator + javaExecutableName(),
+            "-Xshare:dump",
+            "-XX:-UseCompressedOops",
+            "-XX:SharedArchiveFile=" + archiveName,
+        };
+        List<String> javaCmd = Arrays.asList(javaCmdArray);
+        System.out.println("command: " + javaCmd.stream().collect(
+                                             Collectors.joining(" ")));
+        ProcessBuilder builder = new ProcessBuilder(javaCmd);
+        int status = -1;
+        try {
+            Process p = builder.start();
+            status = p.waitFor();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        if (status == 0) {
+            System.out.println("Created NOCOOPS CDS archive successfully");
+        } else {
+            System.out.println("Failed creating NOCOOPS CDS archive!");
+        }
+    }
+
+    @Override
+    public List<String> process(ExecutableImage image, ImageProvider provider) {
+        Thread.dumpStack();
+        if (!provider.generateCDSArchive()) {
+            System.out.println("    generateCDSArchive was not set");
+            return null;
+        }
+        System.out.println("image.getHome() " + image.getHome().toString());
+        Path classListPath = image.getHome().resolve("lib").resolve("classlist");
+        File f = new File(classListPath.toString());
+        if (f.exists()) {
+            System.out.println("classListPath " + classListPath.toString());
+
+            createCDSArchive(image);
+
+            if (System.getProperty("os.arch").indexOf("64") != -1) {
+                createNoCoopsCDSArchive(image);
+            }
+        }
+        return null;
     }
 
     @Override

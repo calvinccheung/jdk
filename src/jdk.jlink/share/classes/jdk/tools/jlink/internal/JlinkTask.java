@@ -178,7 +178,10 @@ public class JlinkTask {
         }, true, "--full-version"),
         new Option<JlinkTask>(false, (task, opt, arg) -> {
             task.options.ignoreSigning = true;
-        }, "--ignore-signing-information"),};
+        }, "--ignore-signing-information"),
+        new Option<JlinkTask>(false, (task, opt, arg) -> {
+            task.options.generateCDSArchive = true;
+        }, "--generate-cds-archive"),};
 
     private static final String PROGNAME = "jlink";
     private final OptionsValues options = new OptionsValues();
@@ -218,6 +221,7 @@ public class JlinkTask {
         boolean ignoreSigning = false;
         boolean bindServices = false;
         boolean suggestProviders = false;
+        boolean generateCDSArchive = false;
     }
 
     int run(String[] args) {
@@ -321,6 +325,7 @@ public class JlinkTask {
                                     IGNORE_SIGNING_DEFAULT,
                                     false,
                                     false,
+                                    false,
                                     null);
 
         // Then create the Plugin Stack
@@ -401,6 +406,7 @@ public class JlinkTask {
                                                           options.ignoreSigning,
                                                           options.bindServices,
                                                           options.verbose,
+                                                          options.generateCDSArchive,
                                                           log);
 
         // Then create the Plugin Stack
@@ -482,6 +488,7 @@ public class JlinkTask {
                                                      boolean ignoreSigning,
                                                      boolean bindService,
                                                      boolean verbose,
+                                                     boolean generateCDSArchive,
                                                      PrintWriter log)
             throws IOException
     {
@@ -529,7 +536,7 @@ public class JlinkTask {
 
         Map<String, Path> mods = cf.modules().stream()
             .collect(Collectors.toMap(ResolvedModule::name, JlinkTask::toPathLocation));
-        return new ImageHelper(cf, mods, config.getByteOrder(), retainModulesPath, ignoreSigning);
+        return new ImageHelper(cf, mods, config.getByteOrder(), retainModulesPath, ignoreSigning, generateCDSArchive);
     }
 
     /*
@@ -743,15 +750,18 @@ public class JlinkTask {
         final boolean ignoreSigning;
         final Runtime.Version version;
         final Set<Archive> archives;
+        final boolean generateCDSArchive;
 
         ImageHelper(Configuration cf,
                     Map<String, Path> modsPaths,
                     ByteOrder order,
                     Path packagedModulesPath,
-                    boolean ignoreSigning) throws IOException {
+                    boolean ignoreSigning,
+                    boolean generateCDSArchive) throws IOException {
             this.order = order;
             this.packagedModulesPath = packagedModulesPath;
             this.ignoreSigning = ignoreSigning;
+            this.generateCDSArchive = generateCDSArchive;
 
             // use the version of java.base module, if present, as
             // the release version for multi-release JAR files
@@ -832,6 +842,11 @@ public class JlinkTask {
                 }
             }
             return image;
+        }
+
+        @Override
+        public boolean generateCDSArchive() {
+            return generateCDSArchive;
         }
     }
 }
