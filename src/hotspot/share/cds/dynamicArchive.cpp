@@ -43,6 +43,7 @@
 #include "memory/resourceArea.hpp"
 #include "oops/klass.inline.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/mutexLocker.hpp"
 #include "runtime/os.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/vmThread.hpp"
@@ -377,7 +378,29 @@ void DynamicArchive::check_for_dynamic_dump() {
   }
 }
 
+
+
 void DynamicArchive::prepare_for_dump_at_exit() {
+  #define PREPARE_FOR_DUMP_NOT_RUN 0
+  #define PREPARE_FOR_DUMP_RUNNING 1
+  #define PREPARE_FOR_DUMP_DONE    2
+  static volatile jint _prepared_for_dump = PREPARE_FOR_DUMP_NOT_RUN;
+  { MonitorLocker ml(PrepareDumping_lock);
+    switch (_prepared_for_dump) {
+    case PREPARE_FOR_DUMP_NOT_RUN:
+      _prepared_for_dump = PREPARE_FOR_DUMP_RUNNING;
+      break;
+    case PREPARE_FOR_DUMP_RUNNING:
+      while (_prepared_for_dump == PREPARE_FOR_DUMP_RUNNING) {
+        ml.wait();
+      }
+      assert(_prepared_for_dump == PREPARE_FOR_DUMP_DONE, "invalid state");
+      return;
+    case PREPARE_FOR_DUMP_DONE:
+      return;
+    }
+  }
+
   EXCEPTION_MARK;
   ResourceMark rm(THREAD);
   MetaspaceShared::link_shared_classes(false/*not from jcmd*/, THREAD);
@@ -389,6 +412,15 @@ void DynamicArchive::prepare_for_dump_at_exit() {
     DynamicDumpSharedSpaces = false;
     CLEAR_PENDING_EXCEPTION;
   }
+
+  { MonitorLocker ml(PrepareDumping_lock);
+    _prepared_for_dump = PREPARE_FOR_DUMP_DONE;
+    PrepareDumping_lock->notify_all();
+  }
+
+  #undef PREPARE_FOR_DUMP_NOT_RUN
+  #undef PREPARE_FOR_DUMP_RUNNING
+  #undef PREPARE_FOR_DUMP_DONE
 }
 
 // This is called by "jcmd VM.cds dynamic_dump"

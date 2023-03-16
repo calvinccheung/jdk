@@ -153,6 +153,7 @@ Mutex*   DumpTimeTable_lock           = nullptr;
 Mutex*   CDSLambda_lock               = nullptr;
 Mutex*   DumpRegion_lock              = nullptr;
 Mutex*   ClassListFile_lock           = nullptr;
+Monitor* PrepareDumping_lock          = nullptr;
 Mutex*   UnregisteredClassesTable_lock= nullptr;
 Mutex*   LambdaFormInvokers_lock      = nullptr;
 Mutex*   ScratchObjects_lock          = nullptr;
@@ -329,6 +330,7 @@ void mutex_init() {
   def(CDSLambda_lock               , PaddedMutex  , nosafepoint);
   def(DumpRegion_lock              , PaddedMutex  , nosafepoint);
   def(ClassListFile_lock           , PaddedMutex  , nosafepoint);
+  def(PrepareDumping_lock          , PaddedMonitor ,safepoint);
   def(LambdaFormInvokers_lock      , PaddedMutex  , safepoint);
   def(ScratchObjects_lock          , PaddedMutex  , nosafepoint-1); // Holds DumpTimeTable_lock
 #endif // INCLUDE_CDS

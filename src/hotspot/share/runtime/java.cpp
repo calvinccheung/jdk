@@ -441,6 +441,23 @@ void before_exit(JavaThread* thread, bool halt) {
 
   // Actual shutdown logic begins here.
 
+  HandleMark hm(thread);
+  // We could get here with a pending exception, if so clear it now or
+  // it will cause MetaspaceShared::link_shared_classes to
+  // fail for dynamic dump.
+  if (thread->has_pending_exception()) {
+    thread->clear_pending_exception();
+  }
+
+#if INCLUDE_CDS
+  // Link all classes for dynamic CDS dumping before vm exit.
+  // Same operation is being done in JVM_BeforeHalt for handling the
+  // case where the application calls System.exit().
+  if (DynamicArchive::should_dump_at_vm_exit()) {
+    DynamicArchive::prepare_for_dump_at_exit();
+  }
+#endif
+
 #if INCLUDE_JVMCI
   if (EnableJVMCI) {
     JVMCI::shutdown(thread);

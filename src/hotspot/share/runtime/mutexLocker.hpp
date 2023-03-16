@@ -124,6 +124,7 @@ extern Mutex*   DumpTimeTable_lock;              // SystemDictionaryShared::_dum
 extern Mutex*   CDSLambda_lock;                  // SystemDictionaryShared::get_shared_lambda_proxy_class
 extern Mutex*   DumpRegion_lock;                 // Symbol::operator new(size_t sz, int len)
 extern Mutex*   ClassListFile_lock;              // ClassListWriter()
+extern Monitor* PrepareDumping_lock;             // DynamicArchive::prepare_for_dump_at_exit()
 extern Mutex*   UnregisteredClassesTable_lock;   // UnregisteredClassesTableTable
 extern Mutex*   LambdaFormInvokers_lock;         // Protecting LambdaFormInvokers::_lambdaform_lines
 extern Mutex*   ScratchObjects_lock;             // Protecting _scratch_xxx_table in heapShared.cpp
