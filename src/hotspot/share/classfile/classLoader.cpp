@@ -521,7 +521,7 @@ void ClassLoader::setup_app_search_path(JavaThread* current, const char *class_p
 
   while (cp_stream.has_next()) {
     const char* path = cp_stream.get_next();
-    update_class_path_entry_list(current, path, false, false, false);
+    update_class_path_entry_list(current, path, true, false, false);
   }
 }
 
@@ -806,10 +806,12 @@ void ClassLoader::add_to_app_classpath_entries(JavaThread* current,
                                                bool check_for_duplicates) {
 #if INCLUDE_CDS
   assert(entry != nullptr, "ClassPathEntry should not be nullptr");
+  tty->print_cr("    processing entry %s check_for_duplicates %d", entry->name(), check_for_duplicates);
   ClassPathEntry* e = _app_classpath_entries;
   if (check_for_duplicates) {
     while (e != nullptr) {
       if (strcmp(e->name(), entry->name()) == 0) {
+        tty->print_cr("    duplicate entry %s", entry->name());
         // entry already exists
         return;
       }
